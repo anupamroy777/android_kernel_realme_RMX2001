@@ -32,7 +32,10 @@ make -j$(nproc --all) O=out \
 
 function zupload()
 {
-git clone --depth=1 https://github.com/AbzRaider/AnyKernel33.git AnyKernel
+mkdir
+cd AnyKernel 
+git clone --depth=1 https://github.com/AbzRaider/AnyKernel33.git -b rui1
+cd /
 cp out/arch/arm64/boot/Image.gz-dtb AnyKernel
 cd AnyKernel
 zip -r9 Azrael-lto-KERNEL-RMX2001.zip *
