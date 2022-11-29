@@ -288,7 +288,7 @@ static unsigned int gx_gpu_freq_avg;
 
 #ifdef GED_KPI_CPU_BOOST
 static int boost_accum_cpu;
-static long target_t_cpu_remained = 16000000; /* for non-GED_KPI_MAX_FPS-FPS cases */
+static long target_t_cpu_remained = 8300000; /* for non-GED_KPI_MAX_FPS-FPS cases */
 /* static long target_t_cpu_remained_min = 8300000; */ /* default 0.5 vsync period */
 static int cpu_boost_policy=-1;
 static int boost_extra;
@@ -447,7 +447,7 @@ static void ged_kpi_push_cur_fps_and_detect_app_self_frc(int fps)
 	int fps_grp[GED_KPI_GAME_SELF_FRC_DETECT_MONITOR_WINDOW_SIZE];
 	int i;
 
-	if (enable_game_self_frc_detect && fps > 18 && fps <= 61) {
+	if (enable_game_self_frc_detect && fps > 18 && fps <= 91) {
 		fps_records[cur_fps_idx] = fps;
 		if (reset == 0) {
 			if (fps > target_fps_4_main_head + 1 || afrc_rst_cnt_down == 120) {
