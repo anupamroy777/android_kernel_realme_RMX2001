@@ -447,7 +447,7 @@ static void ged_kpi_push_cur_fps_and_detect_app_self_frc(int fps)
 	int fps_grp[GED_KPI_GAME_SELF_FRC_DETECT_MONITOR_WINDOW_SIZE];
 	int i;
 
-	if (enable_game_self_frc_detect && fps > 18 && fps <= 91) {
+	if (enable_game_self_frc_detect && fps > 18 && fps <= 61) {
 		fps_records[cur_fps_idx] = fps;
 		if (reset == 0) {
 			if (fps > target_fps_4_main_head + 1 || afrc_rst_cnt_down == 120) {
