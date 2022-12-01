@@ -307,7 +307,7 @@ module_param(deboost_reduce, int, 0644);
 module_param(boost_upper_bound, int, 0644);
 module_param(enable_game_self_frc_detect, int, 0644);
 #endif
-module_param(gx_game_mode, int, 0777);
+module_param(gx_game_mode, int, 0644);
 module_param(gx_3D_benchmark_on, int, 0644);
 
 int (*ged_kpi_push_game_frame_time_fp_fbt)(
