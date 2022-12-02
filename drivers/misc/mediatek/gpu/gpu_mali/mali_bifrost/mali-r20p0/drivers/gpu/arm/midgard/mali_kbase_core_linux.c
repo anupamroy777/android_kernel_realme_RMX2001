@@ -89,7 +89,7 @@
 #include <linux/log2.h>
 
 #include <mali_kbase_config.h>
-#include <linux/pm_qos.h>
+
 
 #if (KERNEL_VERSION(3, 13, 0) <= LINUX_VERSION_CODE)
 #include <linux/pm_opp.h>
@@ -499,7 +499,7 @@ static int assign_irqs(struct platform_device *pdev)
 		irqtag = i;
 #endif /* CONFIG_OF */
 		kbdev->irqs[irqtag].irq = irq_res->start;
-		kbdev->irqs[irqtag].flags = irq_res->flags & IRQF_TRIGGER_MASK | IRQF_PERF_AFFINE;
+		kbdev->irqs[irqtag].flags = irq_res->flags & IRQF_TRIGGER_MASK;
 	}
 
 	return 0;
@@ -1435,7 +1435,7 @@ static int kbase_api_tlstream_stats(struct kbase_context *kctx,
 		return ret;                                            \
 	} while (0)
 
-static long __kbase_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+static long kbase_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct kbase_file *const kfile = filp->private_data;
 	struct kbase_context *kctx = NULL;
@@ -1701,22 +1701,6 @@ static long __kbase_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 
 	return -ENOIOCTLCMD;
 }
-
-long kbase_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
-{
-	struct pm_qos_request req = {
-		.type = PM_QOS_REQ_AFFINE_CORES,
-		.cpus_affine = ATOMIC_INIT(BIT(raw_smp_processor_id()))
-	};
-	long ret;
-
-	pm_qos_add_request(&req, PM_QOS_CPU_DMA_LATENCY, 100);
-	ret = __kbase_ioctl(filp, cmd, arg);
-	pm_qos_remove_request(&req);
-
-	return ret;
-}
-
 
 static ssize_t kbase_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
