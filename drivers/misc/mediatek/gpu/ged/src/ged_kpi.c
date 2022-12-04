@@ -447,7 +447,7 @@ static void ged_kpi_push_cur_fps_and_detect_app_self_frc(int fps)
 	int fps_grp[GED_KPI_GAME_SELF_FRC_DETECT_MONITOR_WINDOW_SIZE];
 	int i;
 
-	if (enable_game_self_frc_detect && fps > 18 && fps <= 61) {
+	if (enable_game_self_frc_detect && fps > 18 && fps <= 90) {
 		fps_records[cur_fps_idx] = fps;
 		if (reset == 0) {
 			if (fps > target_fps_4_main_head + 1 || afrc_rst_cnt_down == 120) {
@@ -599,7 +599,7 @@ static void ged_kpi_push_cur_fps_and_detect_app_self_frc(int fps)
 #ifdef GED_KPI_DEBUG
 				GED_LOGE("[AFRC] fps_grp: %d, %d, %d\n", fps_grp[0], fps_grp[1], fps_grp[2]);
 #endif
-				if (reset == 0 && fps_grp[0] < 89) {
+				if (reset == 0 && fps_grp[0] < 50) {
 					target_fps_4_main_head = fps_grp[0];
 					is_game_control_frame_rate = 1;
 				} else {
