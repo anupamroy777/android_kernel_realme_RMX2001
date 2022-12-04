@@ -224,7 +224,7 @@ typedef struct GED_KPI_GPU_TS_TAG {
 
 /* static int display_fps = GED_KPI_MAX_FPS; */
 static int is_game_control_frame_rate;
-static int target_fps_4_main_head = 90;
+static int target_fps_4_main_head = 89;
 static long long vsync_period = GED_KPI_SEC_DIVIDER / GED_KPI_MAX_FPS;
 static GED_LOG_BUF_HANDLE ghLogBuf;
 static struct workqueue_struct *g_psWorkQueue;
@@ -612,7 +612,7 @@ static void ged_kpi_push_cur_fps_and_detect_app_self_frc(int fps)
 		cur_fps_idx++;
 		cur_fps_idx %= GED_KPI_GAME_SELF_FRC_DETECT_MONITOR_WINDOW_SIZE;
 	} else {
-		if (target_fps_4_main_head == 90 || enable_game_self_frc_detect == 0)
+		if (target_fps_4_main_head == 91 || enable_game_self_frc_detect == 0)
 			is_game_control_frame_rate = 0;
 	}
 #ifdef GED_KPI_DEBUG
