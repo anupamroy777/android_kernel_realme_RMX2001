@@ -232,7 +232,7 @@ static GED_HASHTABLE_HANDLE gs_hashtable;
 static GED_KPI g_asKPI[GED_KPI_TOTAL_ITEMS];
 static int g_i32Pos;
 static GED_THREAD_HANDLE ghThread;
-static unsigned int gx_dfps; /* variable to fix FPS*/
+static unsigned int gx_dfps= 89; /* variable to fix FPS*/
 static unsigned int gx_frc_mode; /* variable to fix FRC mode*/
 #ifdef GED_KPI_CPU_BOOST
 static unsigned int enable_cpu_boost = 1;
@@ -272,7 +272,7 @@ static unsigned long long g_gpu_freq_accum;
 static unsigned int g_frame_count;
 
 static int gx_game_mode;
-static int gx_3D_benchmark_on;
+static int gx_3D_benchmark_on = -1;
 #ifdef GED_KPI_CPU_BOOST
 static int gx_force_cpu_boost;
 static int gx_top_app_pid;
@@ -288,7 +288,7 @@ static unsigned int gx_gpu_freq_avg;
 
 #ifdef GED_KPI_CPU_BOOST
 static int boost_accum_cpu;
-static long target_t_cpu_remained = 8300000; /* for non-GED_KPI_MAX_FPS-FPS cases */
+static long target_t_cpu_remained = 14300000; /* for non-GED_KPI_MAX_FPS-FPS cases */
 /* static long target_t_cpu_remained_min = 8300000; */ /* default 0.5 vsync period */
 static int cpu_boost_policy=-1;
 static int boost_extra;
@@ -599,7 +599,7 @@ static void ged_kpi_push_cur_fps_and_detect_app_self_frc(int fps)
 #ifdef GED_KPI_DEBUG
 				GED_LOGE("[AFRC] fps_grp: %d, %d, %d\n", fps_grp[0], fps_grp[1], fps_grp[2]);
 #endif
-				if (reset == 0 && fps_grp[0] < 50) {
+				if (reset == 0 && fps_grp[0] < 65) {
 					target_fps_4_main_head = fps_grp[0];
 					is_game_control_frame_rate = 1;
 				} else {
@@ -612,7 +612,7 @@ static void ged_kpi_push_cur_fps_and_detect_app_self_frc(int fps)
 		cur_fps_idx++;
 		cur_fps_idx %= GED_KPI_GAME_SELF_FRC_DETECT_MONITOR_WINDOW_SIZE;
 	} else {
-		if (target_fps_4_main_head == 91 || enable_game_self_frc_detect == 0)
+		if (target_fps_4_main_head == 70 || enable_game_self_frc_detect == 0)
 			is_game_control_frame_rate = 0;
 	}
 #ifdef GED_KPI_DEBUG
