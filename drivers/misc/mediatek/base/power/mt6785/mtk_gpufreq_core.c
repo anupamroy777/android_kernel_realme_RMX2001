@@ -140,7 +140,7 @@ static unsigned int g_ptpod_opp_idx_table_segment[] = {
 	 0, 12, 15, 18,
 	20, 22, 24, 26,
 	28, 30, 32, 34,
-	36, 38, 40, 42
+	36, 38, 40 , 41
 };
 
 static struct g_opp_table_info g_opp_table_segment[] = {
@@ -186,7 +186,6 @@ static struct g_opp_table_info g_opp_table_segment[] = {
 	GPUOP(SEG_GPU_DVFS_FREQ39, SEG_GPU_DVFS_VOLT39, SEG_GPU_DVFS_VSRAM20),
 	GPUOP(SEG_GPU_DVFS_FREQ40, SEG_GPU_DVFS_VOLT40, SEG_GPU_DVFS_VSRAM20),
 	GPUOP(SEG_GPU_DVFS_FREQ41, SEG_GPU_DVFS_VOLT41, SEG_GPU_DVFS_VSRAM20),
-	GPUOP(SEG_GPU_DVFS_FREQ42, SEG_GPU_DVFS_VOLT42, SEG_GPU_DVFS_VSRAM20),
 };
 
 static const struct of_device_id g_gpufreq_of_match[] = {
@@ -2009,7 +2008,7 @@ void __mt_gpufreq_update_aging(bool apply_aging_setting)
 				g_opp_table[i].gpufreq_volt -= 1875;
 			else if (i >= 24 && i <= 33)
 				g_opp_table[i].gpufreq_volt -= 1250;
-			else if (i >= 34 && i <= 42)
+			else if (i >= 34 && i <= 41)
 				g_opp_table[i].gpufreq_volt -= 625;
 
 			g_opp_table[i].gpufreq_vsram =
@@ -2030,7 +2029,7 @@ void __mt_gpufreq_update_aging(bool apply_aging_setting)
 				g_opp_table[i].gpufreq_volt += 1875;
 			else if (i >= 24 && i <= 33)
 				g_opp_table[i].gpufreq_volt += 1250;
-			else if (i >= 34 && i <= 42)
+			else if (i >= 34 && i <= 41)
 				g_opp_table[i].gpufreq_volt += 625;
 
 			g_opp_table[i].gpufreq_vsram =
@@ -3177,17 +3176,9 @@ static void __mt_gpufreq_setup_opp_table(
 				freqs[i].gpufreq_vsram);
 	}
 
-	/* setup OPP table by device ID */
-	if (g_segment_id == MT6785U_SEGMENT)
-		g_segment_max_opp_idx = 0;
-	else if (g_segment_id == MT6785T_SEGMENT)
-		g_segment_max_opp_idx = 15;
-	else if (g_segment_id == MT6785_SEGMENT)
-		g_segment_max_opp_idx = 21;
-	else if (g_segment_id == MT6783_SEGMENT)
-		g_segment_max_opp_idx = 30;
-	else
-		g_segment_max_opp_idx = 15;
+	//* allow 876Mhz for NEMO */
+
+	g_segment_max_opp_idx = 0;
 
 	g_segment_min_opp_idx = NUM_OF_OPP_IDX - 1;
 
