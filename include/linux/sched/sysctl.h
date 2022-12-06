@@ -14,14 +14,6 @@ extern int sysctl_hung_task_warnings;
 extern int proc_dohung_task_timeout_secs(struct ctl_table *table, int write,
 					 void __user *buffer,
 					 size_t *lenp, loff_t *ppos);
-#ifdef VENDOR_EDIT
-/* fanhui@PhoneSW.BSP, 2016/02/02, DeathHealer, record the hung task killing */
-extern char sysctl_hung_task_oppo_kill[];
-#endif
-#if defined(VENDOR_EDIT) && defined(CONFIG_DEATH_HEALER)
-/* Wen.Luo@BSP.Kernel.Stability, 2019/01/12, DeathHealer , Foreground background optimization,change max io count */
-extern int sysctl_hung_task_maxiowait_count;
-#endif
 #else
 /* Avoid need for ifdefs elsewhere in the code */
 enum { sysctl_hung_task_timeout_secs = 0 };
@@ -121,5 +113,10 @@ extern int sysctl_numa_balancing(struct ctl_table *table, int write,
 extern int sysctl_schedstats(struct ctl_table *table, int write,
 				 void __user *buffer, size_t *lenp,
 				 loff_t *ppos);
+
+#define LIB_PATH_LENGTH 512
+extern char sched_lib_name[LIB_PATH_LENGTH];
+extern unsigned int sched_lib_mask_force;
+extern bool is_sched_lib_based_app(pid_t pid);
 
 #endif /* _LINUX_SCHED_SYSCTL_H */

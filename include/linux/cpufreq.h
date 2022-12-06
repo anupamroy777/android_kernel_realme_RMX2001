@@ -2,6 +2,7 @@
  * linux/include/linux/cpufreq.h
  *
  * Copyright (C) 2001 Russell King
+ * Copyright (C) 2020 XiaoMi, Inc.
  *           (C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -158,6 +159,8 @@ struct cpufreq_policy {
 #define CPUFREQ_SHARED_TYPE_HW	 (1) /* HW does needed coordination */
 #define CPUFREQ_SHARED_TYPE_ALL	 (2) /* All dependent CPUs should set freq */
 #define CPUFREQ_SHARED_TYPE_ANY	 (3) /* Freq can be set from any dependent CPU*/
+
+void thermal_limits_notify(struct cpufreq_policy *policy);
 
 #ifdef CONFIG_CPU_FREQ
 struct cpufreq_policy *cpufreq_cpu_get_raw(unsigned int cpu);
@@ -429,6 +432,7 @@ static inline void cpufreq_resume(void) {}
 /* Policy Notifiers  */
 #define CPUFREQ_ADJUST			(0)
 #define CPUFREQ_NOTIFY			(1)
+#define CPUFREQ_THERMAL                 (2)
 
 #ifdef CONFIG_CPU_FREQ
 int cpufreq_register_notifier(struct notifier_block *nb, unsigned int list);
@@ -909,10 +913,6 @@ static inline bool policy_has_boost_freq(struct cpufreq_policy *policy)
 }
 #endif
 
-#ifdef VENDOR_EDIT
-struct list_head *get_cpufreq_policy_list(void);
-#endif /* VENDOR_EDIT */
-
 extern void arch_freq_prepare_all(void);
 extern unsigned int arch_freq_get_on_cpu(int cpu);
 
@@ -934,4 +934,6 @@ unsigned int cpufreq_generic_get(unsigned int cpu);
 int cpufreq_generic_init(struct cpufreq_policy *policy,
 		struct cpufreq_frequency_table *table,
 		unsigned int transition_latency);
+
+extern unsigned int cpuinfo_max_freq_cached;
 #endif /* _LINUX_CPUFREQ_H */

@@ -52,9 +52,6 @@
 #endif
 #ifdef CONFIG_MTK_SCHED_MONITOR
 #include "mtk_sched_mon.h"
-
-
-
 enum ipi_msg_type {
 	IPI_RESCHEDULE,
 	IPI_CALL_FUNC,
@@ -63,11 +60,6 @@ enum ipi_msg_type {
 	IPI_TIMER,
 	IPI_IRQ_WORK,
 };
-#endif
-
-#ifdef VENDOR_EDIT
-// Liujie.Xie@TECH.Kernel.Sched, 2019/05/22, add for ui first
-#include <linux/oppocfs/oppo_cfs_common.h>
 #endif
 
 DEFINE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
@@ -467,10 +459,11 @@ void wake_q_add(struct wake_q_head *head, struct task_struct *task)
 	 * its already queued (either by us or someone else) and will get the
 	 * wakeup due to that.
 	 *
-	 * This cmpxchg() implies a full barrier, which pairs with the write
-	 * barrier implied by the wakeup in wake_up_q().
+	 * In order to ensure that a pending wakeup will observe our pending
+	 * state, even in the failed case, an explicit smp_mb() must be used.
 	 */
-	if (cmpxchg(&node->next, NULL, WAKE_Q_TAIL))
+	smp_mb__before_atomic();
+	if (cmpxchg_relaxed(&node->next, NULL, WAKE_Q_TAIL))
 		return;
 
 	head->count++;
@@ -4320,12 +4313,7 @@ void scheduler_tick(void)
 #ifdef CONFIG_MTK_SCHED_RQAVG_KS
 	sched_max_util_task_tracking();
 #endif
-#ifdef VENDOR_EDIT
-// Liujie.Xie@TECH.Kernel.Sched, 2019/05/22, add for ui first
-    if (sysctl_uifirst_enabled) {
-        (void)trigger_ux_balance(rq);
-    }
-#endif
+
 #ifdef CONFIG_MTK_SCHED_CPULOAD
 	cal_cpu_load(cpu);
 #endif
@@ -4468,7 +4456,7 @@ static noinline void __schedule_bug(struct task_struct *prev)
 {
 	/* Save this before calling printk(), since that will clobber it */
 	unsigned long preempt_disable_ip = get_preempt_disable_ip(current);
-
+	int i = 0;
 	if (oops_in_progress)
 		return;
 
@@ -4702,10 +4690,7 @@ static void __sched notrace __schedule(bool preempt)
 		rq->clock_update_flags &= ~(RQCF_ACT_SKIP|RQCF_REQ_SKIP);
 		rq_unlock_irq(rq, &rf);
 	}
-#ifdef VENDOR_EDIT
-// Liujie.Xie@TECH.Kernel.Sched, 2019/05/22, add for ui first
-    prev->enqueue_time = rq->clock;
-#endif
+
 #ifdef CONFIG_PREEMPT_MONITOR
 	per_cpu(MT_trace_in_sched, cpu) = 0;
 #endif
@@ -5053,7 +5038,8 @@ void rt_mutex_setprio(struct task_struct *p, struct task_struct *pi_task)
 	 */
 	if (dl_prio(prio)) {
 		if (!dl_prio(p->normal_prio) ||
-		    (pi_task && dl_entity_preempt(&pi_task->dl, &p->dl))) {
+		    (pi_task && dl_prio(pi_task->prio) &&
+		     dl_entity_preempt(&pi_task->dl, &p->dl))) {
 			p->dl.dl_boosted = 1;
 			queue_flag |= ENQUEUE_REPLENISH;
 		} else
@@ -5273,8 +5259,7 @@ static void __setscheduler_params(struct task_struct *p,
 	if (policy == SETPARAM_POLICY)
 		policy = p->policy;
 
-	/* Replace SCHED_FIFO with SCHED_RR to reduce latency */
-	p->policy = policy == SCHED_FIFO ? SCHED_RR : policy;
+	p->policy = policy;
 
 	if (dl_policy(policy))
 		__setparam_dl(p, attr);
@@ -6029,6 +6014,10 @@ again:
 
 		retval = -EINVAL;
 	}
+
+	if (!retval && !(p->flags & PF_KTHREAD))
+		cpumask_and(&p->cpus_requested, in_mask, cpu_possible_mask);
+
 out_free_new_mask:
 	free_cpumask_var(new_mask);
 out_free_cpus_allowed:
@@ -6036,6 +6025,60 @@ out_free_cpus_allowed:
 out_put_task:
 	put_task_struct(p);
 	return retval;
+}
+
+char sched_lib_name[LIB_PATH_LENGTH];
+unsigned int sched_lib_mask_force;
+bool is_sched_lib_based_app(pid_t pid)
+{
+	const char *name = NULL;
+	struct vm_area_struct *vma;
+	char path_buf[LIB_PATH_LENGTH];
+	bool found = false;
+	struct task_struct *p;
+	struct mm_struct *mm;
+
+	if (strnlen(sched_lib_name, LIB_PATH_LENGTH) == 0)
+		return false;
+
+	rcu_read_lock();
+
+	p = find_process_by_pid(pid);
+	if (!p) {
+		rcu_read_unlock();
+		return false;
+	}
+
+	/* Prevent p going away */
+	get_task_struct(p);
+	rcu_read_unlock();
+
+	mm = get_task_mm(p);
+	if (!mm)
+		goto put_task_struct;
+
+	down_read(&mm->mmap_sem);
+	for (vma = mm->mmap; vma ; vma = vma->vm_next) {
+		if (vma->vm_file && vma->vm_flags & VM_EXEC) {
+			name = d_path(&vma->vm_file->f_path,
+					path_buf, LIB_PATH_LENGTH);
+			if (IS_ERR(name))
+				goto release_sem;
+
+			if (strnstr(name, sched_lib_name,
+					strnlen(name, LIB_PATH_LENGTH))) {
+				found = true;
+				break;
+			}
+		}
+	}
+
+release_sem:
+	up_read(&mm->mmap_sem);
+	mmput(mm);
+put_task_struct:
+	put_task_struct(p);
+	return found;
 }
 
 static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
@@ -6092,16 +6135,6 @@ long sched_getaffinity(pid_t pid, struct cpumask *mask)
 
 	raw_spin_lock_irqsave(&p->pi_lock, flags);
 	cpumask_and(mask, &p->cpus_allowed, cpu_active_mask);
-#ifdef VENDOR_EDIT
-    //cuixiaogang@swdp.shanghai, 2018/2/6, Add for cts test
-    /*
-     * The userspace tasks are forbidden to run on
-     * isolated CPUs. So exclude isolated CPUs from
-     * the getaffinity.
-     */
-    if (!(p->flags & PF_KTHREAD))
-        cpumask_andnot(mask, mask, cpu_isolated_mask);
-#endif /* VENDOR_EDIT */
 	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 
 out_unlock:
@@ -6165,12 +6198,8 @@ SYSCALL_DEFINE0(sched_yield)
 	schedstat_inc(rq->yld_count);
 	current->sched_class->yield_task(rq);
 
-	/*
-	 * Since we are going to call schedule() anyway, there's
-	 * no need to preempt or enable interrupts:
-	 */
 	preempt_disable();
-	rq_unlock(rq, &rf);
+	rq_unlock_irq(rq, &rf);
 	sched_preempt_enable_no_resched();
 
 	schedule();
@@ -6582,10 +6611,11 @@ void init_idle(struct task_struct *idle, int cpu)
 	struct rq *rq = cpu_rq(cpu);
 	unsigned long flags;
 
+	__sched_fork(0, idle);
+
 	raw_spin_lock_irqsave(&idle->pi_lock, flags);
 	raw_spin_lock(&rq->lock);
 
-	__sched_fork(0, idle);
 	idle->state = TASK_RUNNING;
 	idle->se.exec_start = sched_clock();
 	idle->flags |= PF_IDLE;
@@ -7462,6 +7492,7 @@ void __init sched_init_smp(void)
 	/* Move init over to a non-isolated CPU */
 	if (set_cpus_allowed_ptr(current, non_isolated_cpus) < 0)
 		BUG();
+	cpumask_copy(&current->cpus_requested, cpu_possible_mask);
 	sched_init_granularity();
 	free_cpumask_var(non_isolated_cpus);
 
@@ -7583,10 +7614,6 @@ void __init sched_init(void)
 		init_cfs_rq(&rq->cfs);
 		init_rt_rq(&rq->rt);
 		init_dl_rq(&rq->dl);
-#ifdef VENDOR_EDIT
-// Liujie.Xie@TECH.Kernel.Sched, 2019/05/22, add for ui first
-        (void)ux_init_rq_data(rq);
-#endif
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
@@ -7893,8 +7920,8 @@ struct task_group *sched_create_group(struct task_group *parent)
 
 #if defined(CONFIG_UCLAMP_TASK_GROUP) && !defined(CONFIG_SCHED_TUNE)
 	if (!alloc_uclamp_sched_group(tg, parent))
-		goto err;
 #endif
+		goto err;
 
 	return tg;
 
@@ -8081,10 +8108,6 @@ static int cpu_cgroup_can_attach(struct cgroup_taskset *tset)
 	cgroup_taskset_for_each(task, css, tset) {
 #ifdef CONFIG_RT_GROUP_SCHED
 		if (!sched_rt_can_attach(css_tg(css), task))
-			return -EINVAL;
-#else
-		/* We don't support RT-tasks being in separate groups */
-		if (task->sched_class != &fair_sched_class)
 			return -EINVAL;
 #endif
 		/*
