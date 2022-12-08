@@ -2,7 +2,6 @@
  *  linux/drivers/cpufreq/cpufreq.c
  *
  *  Copyright (C) 2001 Russell King
- *  Copyright (C) 2020 XiaoMi, Inc.
  *            (C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
  *            (C) 2013 Viresh Kumar <viresh.kumar@linaro.org>
  *
@@ -31,7 +30,6 @@
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
 #include <linux/tick.h>
-#include <linux/sched/sysctl.h>
 #include <trace/events/power.h>
 
 static LIST_HEAD(cpufreq_policy_list);
@@ -216,6 +214,13 @@ unsigned int cpufreq_generic_get(unsigned int cpu)
 	return clk_get_rate(policy->clk) / 1000;
 }
 EXPORT_SYMBOL_GPL(cpufreq_generic_get);
+#ifdef VENDOR_EDIT
+struct list_head *get_cpufreq_policy_list(void)
+{
+    return &cpufreq_policy_list;
+}
+EXPORT_SYMBOL(get_cpufreq_policy_list);
+#endif /* VENDOR_EDIT */
 
 /**
  * cpufreq_cpu_get: returns policy for a cpu and marks it busy.
@@ -235,7 +240,7 @@ struct cpufreq_policy *cpufreq_cpu_get(unsigned int cpu)
 	struct cpufreq_policy *policy = NULL;
 	unsigned long flags;
 
-	if (WARN_ON(cpu >= nr_cpu_ids))
+	if (cpu >= nr_cpu_ids)
 		return NULL;
 
 	/* get the cpufreq driver */
@@ -632,8 +637,25 @@ static int cpufreq_parse_governor(char *str_governor, unsigned int *policy,
 			ret = request_module("cpufreq_%s", str_governor);
 			mutex_lock(&cpufreq_governor_mutex);
 
+			/*
+			 * At this point, if the governor was found via module
+			 * search, it will load it. However, if it didn't, we
+			 * are just going to exit without doing anything to
+			 * the governor. Most of the time, this is totally
+			 * fine; the one scenario where it's not is when a ROM
+			 * has a boot script that requests a governor that
+			 * exists in the default kernel but not in this one.
+			 * This kernel (and nearly every other Android kernel)
+			 * has the performance governor as default for boot
+			 * performance which is then changed to another,
+			 * usually schedutil. So, instead of just exiting if
+			 * the requested governor wasn't found, let's try
+			 * falling back to schedutil before falling out.
+			 */
 			if (ret == 0)
 				t = find_governor(str_governor);
+			else
+				t = find_governor("schedutil");
 		}
 
 		if (t != NULL) {
@@ -662,39 +684,10 @@ static ssize_t show_##file_name				\
 }
 
 show_one(cpuinfo_min_freq, cpuinfo.min_freq);
+show_one(cpuinfo_max_freq, cpuinfo.max_freq);
 show_one(cpuinfo_transition_latency, cpuinfo.transition_latency);
 show_one(scaling_min_freq, min);
 show_one(scaling_max_freq, max);
-
-unsigned int cpuinfo_max_freq_cached;
-
-static bool should_use_cached_freq(int cpu)
-{
-	/* This is a safe check. may not be needed */
-	if (!cpuinfo_max_freq_cached)
-		return false;
-
-	/*
-	 * perfd already configure sched_lib_mask_force to
-	 * 0xf0 from user space. so re-using it.
-	 */
-	if (!(BIT(cpu) & sched_lib_mask_force))
-		return false;
-
-	return is_sched_lib_based_app(current->pid);
-}
-
-static ssize_t show_cpuinfo_max_freq(struct cpufreq_policy *policy, char *buf)
-{
-	unsigned int freq = policy->cpuinfo.max_freq;
-
-	if (should_use_cached_freq(policy->cpu))
-		freq = cpuinfo_max_freq_cached << 1;
-	else
-		freq = policy->cpuinfo.max_freq;
-
-	return scnprintf(buf, PAGE_SIZE, "%u\n", freq);
-}
 
 __weak unsigned int arch_freq_get_on_cpu(int cpu)
 {
@@ -949,9 +942,6 @@ static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
 	struct freq_attr *fattr = to_attr(attr);
 	ssize_t ret;
 
-	if (!fattr->show)
-		return -EIO;
-
 	down_read(&policy->rwsem);
 	ret = fattr->show(policy, buf);
 	up_read(&policy->rwsem);
@@ -965,9 +955,6 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 	struct cpufreq_policy *policy = to_policy(kobj);
 	struct freq_attr *fattr = to_attr(attr);
 	ssize_t ret = -EINVAL;
-
-	if (!fattr->store)
-		return -EIO;
 
 	cpus_read_lock();
 
@@ -1718,9 +1705,6 @@ void cpufreq_resume(void)
 	if (!cpufreq_driver)
 		return;
 
-	if (unlikely(!cpufreq_suspended))
-		return;
-
 	cpufreq_suspended = false;
 
 	if (!has_target() && !cpufreq_driver->resume)
@@ -2239,12 +2223,6 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu)
 }
 EXPORT_SYMBOL(cpufreq_get_policy);
 
-void thermal_limits_notify(struct cpufreq_policy *policy)
-{
-	/* the adjusted frequency should not exceed thermal limit */
-	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
-			CPUFREQ_THERMAL, policy);
-}
 /*
  * policy : current policy.
  * new_policy: policy to be set.
@@ -2275,9 +2253,6 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	/* adjust if necessary - all reasons */
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 			CPUFREQ_ADJUST, new_policy);
-	/* the adjusted frequency should not exceed thermal limit */
-	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
-			CPUFREQ_THERMAL, new_policy);
 
 	/*
 	 * verify the cpu speed can be set within this limit, which might be
@@ -2555,13 +2530,6 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	if (cpufreq_disabled())
 		return -ENODEV;
 
-	/*
-	 * The cpufreq core depends heavily on the availability of device
-	 * structure, make sure they are available before proceeding further.
-	 */
-	if (!get_cpu_device(0))
-		return -EPROBE_DEFER;
-
 	if (!driver_data || !driver_data->verify || !driver_data->init ||
 	    !(driver_data->setpolicy || driver_data->target_index ||
 		    driver_data->target) ||
@@ -2666,6 +2634,14 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 }
 EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
 
+/*
+ * Stop cpufreq at shutdown to make sure it isn't holding any locks
+ * or mutexes when secondary CPUs are halted.
+ */
+static struct syscore_ops cpufreq_syscore_ops = {
+	.shutdown = cpufreq_suspend,
+};
+
 struct kobject *cpufreq_global_kobject;
 EXPORT_SYMBOL(cpufreq_global_kobject);
 
@@ -2676,6 +2652,8 @@ static int __init cpufreq_core_init(void)
 
 	cpufreq_global_kobject = kobject_create_and_add("cpufreq", &cpu_subsys.dev_root->kobj);
 	BUG_ON(!cpufreq_global_kobject);
+
+	register_syscore_ops(&cpufreq_syscore_ops);
 
 	return 0;
 }
