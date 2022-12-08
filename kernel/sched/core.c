@@ -6041,7 +6041,7 @@ out_put_task:
 char sched_lib_name[LIB_PATH_LENGTH];
 unsigned int sched_lib_mask_check;
 unsigned int sched_lib_mask_force;
-static inline bool is_sched_lib_based_app(pid_t pid)
+ bool is_sched_lib_based_app(pid_t pid)
 {
 	const char *name = NULL;
 	struct vm_area_struct *vma;
