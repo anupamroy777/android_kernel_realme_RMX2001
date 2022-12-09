@@ -29,6 +29,7 @@
 #define FP_ID_MAX_LENGTH                60 /*the length of /proc/fp_id should less than FP_ID_MAX_LENGTH !!!*/
 #define ENGINEER_MENU_SELECT_MAXLENTH   20
 #define FP_ID_SUFFIX_MAX_LENGTH         30 /*the length of FP ID SUFFIX !!!*/
+#define CONFIG_OPPO_FINGERPRINT_PLATFORM  6785 /*Board Info*/
 
 typedef enum {
         FP_FPC_1022,

@@ -686,7 +686,7 @@ bool oppo_vooc_wake_fastchg_work(struct oppo_vooc_chip *chip)
 {
         return schedule_delayed_work(&chip->fastchg_work, 0);
 }
-
+	/*
 void oppo_vooc_print_log(void)
 {
         if (!g_vooc_chip) {
@@ -696,6 +696,7 @@ void oppo_vooc_print_log(void)
                 g_vooc_chip->fastchg_allow, g_vooc_chip->fastchg_started, g_vooc_chip->fastchg_dummy_started,
                 g_vooc_chip->fastchg_to_normal, g_vooc_chip->fastchg_to_warm, g_vooc_chip->btb_temp_over);
 }
+*/
 
 bool oppo_vooc_get_allow_reading(void)
 {

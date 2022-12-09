@@ -610,6 +610,7 @@ static int sys_sync_queue(void)
 		schedule_work(&sys_sync_work);
 	}
 
+
 	while (wait_event_timeout(sys_sync_wait, sys_sync_completed,
 						msecs_to_jiffies(100)) == 0) {
 		if (pm_wakeup_pending()) {
